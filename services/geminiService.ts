@@ -2,7 +2,13 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Theme, Player, GameResponse } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const getAI = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error("API Key not found in process.env.API_KEY");
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 const RESPONSE_SCHEMA = {
   type: Type.OBJECT,
@@ -45,6 +51,7 @@ const RESPONSE_SCHEMA = {
 };
 
 export const startNewGame = async (player: Player): Promise<GameResponse> => {
+  const ai = getAI();
   const prompt = `Start a new game for a player named ${player.name} in the theme of ${player.theme}. 
   Describe the initial scene vividly and provide the first set of choices. 
   The player starts with: Health ${player.health}, Inventory: ${player.inventory.join(", ")}.`;
@@ -65,6 +72,7 @@ export const startNewGame = async (player: Player): Promise<GameResponse> => {
     },
   });
 
+  if (!response.text) throw new Error("No response text from Gemini");
   return JSON.parse(response.text);
 };
 
@@ -73,6 +81,7 @@ export const processAction = async (
   action: string,
   history: string[]
 ): Promise<GameResponse> => {
+  const ai = getAI();
   const prompt = `The player decided to: "${action}".
   Current Player State:
   - Health: ${player.health}
@@ -97,5 +106,6 @@ export const processAction = async (
     },
   });
 
+  if (!response.text) throw new Error("No response text from Gemini");
   return JSON.parse(response.text);
 };

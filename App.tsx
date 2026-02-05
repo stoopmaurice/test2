@@ -12,11 +12,13 @@ import {
   Skull, 
   Trophy,
   Terminal,
-  ChevronRight
+  ChevronRight,
+  AlertTriangle
 } from 'lucide-react';
 
 const App: React.FC = () => {
   const [gameState, setGameState] = useState<GameState>(GameState.START);
+  const [apiError, setApiError] = useState<string | null>(null);
   const [player, setPlayer] = useState<Player>({
     name: '',
     health: 100,
@@ -30,6 +32,13 @@ const App: React.FC = () => {
   const [customAction, setCustomAction] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Check for API key on mount
+    if (!process.env.API_KEY) {
+      setApiError("API Key is missing. Please ensure process.env.API_KEY is configured in your environment.");
+    }
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -49,9 +58,9 @@ const App: React.FC = () => {
         timestamp: Date.now()
       }]);
       setGameState(GameState.PLAYING);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Failed to start game. Check your API Key or try again.");
+      setApiError(error.message || "Failed to connect to Gemini API.");
       setGameState(GameState.START);
     }
   };
@@ -72,19 +81,16 @@ const App: React.FC = () => {
     try {
       const response = await processAction(player, actionText, history);
       
-      // Update player state
       setPlayer(prev => {
         let newHealth = Math.min(100, prev.health + response.healthChange);
         let newXp = prev.xp + response.xpReward;
         let newLevel = prev.level;
         
-        // Level up logic
         if (newXp >= prev.level * 100) {
           newXp -= prev.level * 100;
           newLevel += 1;
         }
 
-        // Inventory logic
         let newInventory = [...prev.inventory];
         response.inventoryUpdate.add.forEach(item => newInventory.push(item));
         response.inventoryUpdate.remove.forEach(item => {
@@ -132,13 +138,30 @@ const App: React.FC = () => {
     setMessages([]);
     setCurrentNarrative(null);
     setHistory([]);
+    setApiError(null);
   };
 
+  if (apiError) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center p-6 text-center">
+        <div className="max-w-md bg-slate-900 border border-red-500/50 p-8 rounded-3xl shadow-2xl">
+          <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-white mb-4">Configuration Error</h1>
+          <p className="text-slate-400 mb-6 font-mono text-sm">{apiError}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="bg-white text-black font-bold px-6 py-2 rounded-xl hover:bg-slate-200 transition-colors"
+          >
+            Retry Connection
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 md:p-8 overflow-hidden relative">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 md:p-8 overflow-hidden relative bg-[#030712]">
       <div className="scanline-effect"></div>
-      
-      {/* Background Decor */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-indigo-900/20 via-slate-900 to-black pointer-events-none"></div>
 
       {gameState === GameState.START && (
@@ -196,8 +219,6 @@ const App: React.FC = () => {
 
       {(gameState === GameState.PLAYING || gameState === GameState.LOADING || gameState === GameState.GAMEOVER) && (
         <div className="flex flex-col md:flex-row w-full max-w-6xl h-[90vh] gap-6 z-10 animate-in fade-in slide-in-from-bottom-10 duration-700">
-          
-          {/* Left Sidebar: Stats */}
           <div className="w-full md:w-80 flex flex-col gap-4">
             <div className="bg-slate-900/80 backdrop-blur-lg border border-slate-700 p-6 rounded-3xl">
               <div className="flex items-center gap-3 mb-6">
@@ -255,10 +276,7 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Main Game Console */}
           <div className="flex-1 flex flex-col bg-slate-900/60 backdrop-blur-xl border border-slate-700 rounded-3xl overflow-hidden shadow-2xl relative">
-            
-            {/* Console Header */}
             <div className="bg-slate-800/50 border-b border-slate-700 p-4 flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
@@ -273,7 +291,6 @@ const App: React.FC = () => {
               </button>
             </div>
 
-            {/* Narrative Feed */}
             <div 
               ref={scrollRef}
               className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 custom-scrollbar scroll-smooth"
@@ -320,7 +337,6 @@ const App: React.FC = () => {
               )}
             </div>
 
-            {/* Interaction Area */}
             {gameState === GameState.PLAYING && currentNarrative && (
               <div className="p-6 bg-slate-950/80 border-t border-slate-700">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
